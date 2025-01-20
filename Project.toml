@@ -1,0 +1,4 @@
+name = "ACE"
+uuid = "2aa9fca2-c69f-4e85-87f1-68b2ff6dc12b"
+authors = ["Ivan Anashkin <anashkin.ivan@kstu.ru>"]
+version = "0.1.0"
