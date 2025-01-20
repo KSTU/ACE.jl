@@ -2,3 +2,9 @@ name = "ACE"
 uuid = "2aa9fca2-c69f-4e85-87f1-68b2ff6dc12b"
 authors = ["Ivan Anashkin <anashkin.ivan@kstu.ru>"]
 version = "0.1.0"
+
+[deps]
+Clapeyron = "7c7805af-46cc-48c9-995b-ed0ed2dc909a"
+
+[compat]
+Clapeyron = "0.6.7"
