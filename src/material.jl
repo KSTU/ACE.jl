@@ -3,14 +3,14 @@ Set stream at T -- temperature
 Q -- vapor mole fraction
 A -- initial mole fraction
 """
-function mstream_TQA(G::Float64, T::Float64, A::Vector{Float64}, Q::Float64, model::EoSModel)
+function mstream_TQA(G::Float64, T::Float64, Q::Float64, A::Vector{Float64}, model::EoSModel)
     CP = crit_mix(model, A)
     nsub = length(A)
     if T < CP[1]
         function nl_dew(y)
             eq = []
             for i = 1:nsub
-                push!(eq, Q * y[i] + (1-Q) * dew_pressure(model, T, y)[4][i] - A[i])
+                push!(eq, Q * y[i] + (1.0-Q) * dew_pressure(model, T, y)[4][i] - A[i])
             end
             return eq
         end
@@ -20,6 +20,42 @@ function mstream_TQA(G::Float64, T::Float64, A::Vector{Float64}, Q::Float64, mod
     else
         println("Сверхкритическое состояние")
     end
+    return MaterialStream(G, T, p, x, y, Q, model)
+end
+
+"""
+Set stream at p -- pressure
+Q -- vapor mole fraction
+A -- initial mole fraction
+"""
+function mstream_pQA(G::Float64, p::Float64,  Q::Float64, A::Vector{Float64}, model::EoSModel)
+    CP = crit_mix(model, A)
+    nsub = length(A)
+    function nl_dew(B)
+        eq = []
+        y = zeros(Float64, length(B))
+        for i = 1:nsub-1
+            y[i] = B[i]
+        end
+        y[nsub] = 1.0 - sum(y[1:nsub-1])
+        T = B[nsub]
+        dp = dew_pressure(model, T, y)
+        for i = 1:nsub-1
+            push!(eq, Q * y[i] + (1.0-Q) * dp[4][i] - A[i])
+        end
+        push!(eq, dp[1] - p)
+        return eq
+    end
+    #начальное приближение
+    guess = zeros(Float64, nsub)
+    guess[1:nsub-1] = A[1:nsub-1]
+    guess[nsub] = dew_temperature(model, p, A)[1]    #начальное приближенеи для смеси
+    sol = nlsolve(nl_dew, guess).zero
+    y = zeros(Float64, nsub)
+    y[1:nsub-1] = sol[1:nsub-1]
+    y[nsub] = 1.0 - sum(sol[1:nsub-1])
+    T = sol[nsub]
+    x = dew_pressure(model, T, y)[4]
     return MaterialStream(G, T, p, x, y, Q, model)
 end
 
@@ -38,15 +74,16 @@ function mstream_TpA(G::Float64, T::Float64, p::Float64, A::Vector{Float64}, mod
             Q = 1.0
             y = A
             x = zeros(Float64, length(A))
-            println("Паровая фаза")
+            #println("Паровая фаза")
         elseif p >= pkip
             #одна фаза жидкая
             Q = 0.0
             x = A
             y = zeros(Float64, length(A))
-            println("Жидкая фаза")
+            # println("Жидкая фаза")
         else
             #двухфазная система
+            nsub = length(A)
             function nl_sym(B)
                 # B[1] - y[1]
                 # B[2] - y[2]
@@ -55,7 +92,7 @@ function mstream_TpA(G::Float64, T::Float64, p::Float64, A::Vector{Float64}, mod
                 for i = 1:nsub-1
                     y[i] = B[i]
                 end
-                y[nsub] = 1.0 - sum(B[1:end-1]) 
+                y[nsub] = 1.0 - sum(B[1:end-1])
                 eq = []
                 dp = dew_pressure(model, T, y)
                 for i = 1:nsub-1
@@ -73,7 +110,7 @@ function mstream_TpA(G::Float64, T::Float64, p::Float64, A::Vector{Float64}, mod
             y = zeros(Float64, nsub)
             y[1:end-1] = sol[1:end-1]
             y[end] = 1.0 - sum(sol[1:end-1])
-            x = dew_pressure(sys.model, T, y)[4]
+            x = dew_pressure(model, T, y)[4]
             Q = sol[end]
         end
     else
@@ -81,6 +118,6 @@ function mstream_TpA(G::Float64, T::Float64, p::Float64, A::Vector{Float64}, mod
         y = A
         x = zeros(Float64, length(A))
     end
-    return Stream(G, T, p, x, y, Q, model)
+    return MaterialStream(G, T, p, x, y, Q, model)
 end
 
