@@ -1,31 +1,28 @@
 """
 Функция для расчета смесителя двух потоков
+Давление потоков должно быть одинаковым
 Рассчитываются энтальпии для двух входящий потоков (h1, h2), находится общая энтальпия (h)
 Рассчитывается общее количество молей в каждом потоке (A1, A2)
 N - количество вещества в молях
 """
-function mixer(sin1::Stream, sin2::Stream)
-    sout = copy_stream(sin1)
-    m_sm = sum(sin1.sys.model.params.Mw .* sin1.x) / 1000.0
-    hl1 = enthalpy(sin1.sys.model, sin1.p, sin1.T, sin1.x) / m_sm
-    m_sm = sum(sin1.sys.model.params.Mw .* sin1.y) / 1000.0
-    hv1 = enthalpy(sin1.sys.model, sin1.p, sin1.T, sin1.y) / m_sm
-    h1 = hl1+hv1
-    m_sm = sum(sin2.sys.model.params.Mw .* sin2.x) / 1000.0
-    hl2 = enthalpy(sin2.sys.model, sin2.p, sin2.T, sin2.x) / m_sm
-    m_sm = sum(sin2.sys.model.params.Mw .* sin2.y) / 1000.0
-    hv2 = enthalpy(sin2.sys.model, sin2.p, sin2.T, sin2.y) / m_sm
-    h2 = hl2+hv2
-    h = (sin1.G * h1 + sin2.G * h2)/(sin1.G + sin2.G)
-    sout.G = sin1.G + sin2.G
-    A1 = @. sin1.Q * sin1.y + (1-sin1.Q) * sin1.x
-    A2 = @. sin2.Q * sin2.y + (1-sin2.Q) * sin2.x
-    m_sm1 = sum(sin1.sys.model.params.Mw .* A1) / 1000.0
-    m_sm2 = sum(sin2.sys.model.params.Mw .* A2) / 1000.0
-    N1 = @. A1 * sin1.G / m_sm1
-    N2 = @. A2 * sin2.G / m_sm2
-    N = @. N1 + N2
-    A = N / sum(N)
-    sout.T = find_zero(T -> myH(sout, T) - h, sout.T)
-    return sout
+function mixer(ms_in1::MaterialStream, ms_in2::MaterialStream)
+    if ms_in1.p == ms_in2.p
+        h_in1 = mstream_H_T(ms_in1, ms_in1.T)   #энтельпия первого потока
+        h_in2 = mstream_H_T(ms_in2, ms_in2.T)   #энтальпия второго потока
+        h_out = (ms_in1.G * h_in1 + ms_in2.G * h_in2)/(ms_in1.G + ms_in2.G)    #удельная энтальпия выходящего потока
+        A1 = @. ms_in1.Q * ms_in1.y + (1.0-ms_in1.Q) * ms_in1.x #суммарны доли компонентов в фазах
+        A2 = @. ms_in2.Q * ms_in2.y + (1.0-ms_in2.Q) * ms_in2.x
+        M_sm1 = sum(ms_in1.model.params.Mw .* A1) / 1000.0  #молярная масса смеси
+        M_sm2 = sum(ms_in2.model.params.Mw .* A2) / 1000.0
+        N1 = @. A1 * ms_in1.G / M_sm1     #количество молей
+        N2 = @. A2 * ms_in2.G / M_sm2
+        N = @. N1 + N2  #суммарное количество молей
+        A = N / sum(N)  #мольная доля в двух потоках
+        ms_out = mstream_TpA(ms_in1.G + ms_in2.G, ms_in1.T, ms_in1.p, A, ms_in1.model)    #определяется поток без заданной температуры
+        Tinit = (ms_in1.T * ms_in1.G + ms_in2.T * ms_in2.G) / (ms_in1.G + ms_in2.G)  #начальное приближение для температуры
+        ms_out.T = find_zero(T -> mstream_H_T(ms_out, T) - h_out, Tinit)   #определяем конечную температуру
+        return ms_out
+    else
+        println("Давление входящих потоков должно быть одинаковым")
+    end
 end
