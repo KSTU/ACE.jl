@@ -31,31 +31,41 @@ A -- initial mole fraction
 function mstream_pQA(G::Float64, p::Float64,  Q::Float64, A::Vector{Float64}, model::EoSModel)
     CP = crit_mix(model, A)
     nsub = length(A)
-    function nl_dew(B)
-        eq = []
-        y = zeros(Float64, length(B))
-        for i = 1:nsub-1
-            y[i] = B[i]
+    if Q == 1.0
+        T = dew_temperature(model, p, A)[1]
+        x = zeros(Float64, nsub)
+        y = A
+    elseif Q == 0.0        
+        T = bubble_temperature(model, p, A)[1]
+        x = A
+        y = zeros(Float64, nsub)
+    else
+        function nl_dew(B)
+            eq = []
+            y = zeros(Float64, length(B))
+            for i = 1:nsub-1
+                y[i] = B[i]
+            end
+            y[nsub] = 1.0 - sum(y[1:nsub-1])
+            T = B[nsub]
+            dp = dew_pressure(model, T, y)
+            for i = 1:nsub-1
+                push!(eq, Q * y[i] + (1.0-Q) * dp[4][i] - A[i])
+            end
+            push!(eq, dp[1] - p)
+            return eq
         end
-        y[nsub] = 1.0 - sum(y[1:nsub-1])
-        T = B[nsub]
-        dp = dew_pressure(model, T, y)
-        for i = 1:nsub-1
-            push!(eq, Q * y[i] + (1.0-Q) * dp[4][i] - A[i])
-        end
-        push!(eq, dp[1] - p)
-        return eq
+        #начальное приближение
+        guess = zeros(Float64, nsub)
+        guess[1:nsub-1] = A[1:nsub-1]
+        guess[nsub] = dew_temperature(model, p, A)[1]    #начальное приближенеи для смеси
+        sol = nlsolve(nl_dew, guess).zero
+        y = zeros(Float64, nsub)
+        y[1:nsub-1] = sol[1:nsub-1]
+        y[nsub] = 1.0 - sum(sol[1:nsub-1])
+        T = sol[nsub]
+        x = dew_pressure(model, T, y)[4]
     end
-    #начальное приближение
-    guess = zeros(Float64, nsub)
-    guess[1:nsub-1] = A[1:nsub-1]
-    guess[nsub] = dew_temperature(model, p, A)[1]    #начальное приближенеи для смеси
-    sol = nlsolve(nl_dew, guess).zero
-    y = zeros(Float64, nsub)
-    y[1:nsub-1] = sol[1:nsub-1]
-    y[nsub] = 1.0 - sum(sol[1:nsub-1])
-    T = sol[nsub]
-    x = dew_pressure(model, T, y)[4]
     return MaterialStream(G, T, p, x, y, Q, model)
 end
 

@@ -1,5 +1,7 @@
 module ACE
 
+export EnergyStream
+
 export MaterialStream
 export mstream_TQA
 export mstream_TpA
