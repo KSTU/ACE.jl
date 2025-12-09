@@ -3,24 +3,35 @@ Set stream at T -- temperature
 Q -- vapor mole fraction
 A -- initial mole fraction
 """
-function mstream_TQA(G::Float64, T::Float64, Q::Float64, A::Vector{Float64}, model::EoSModel)
-    CP = crit_mix(model, A)
+function mstream_TQA(N::Float64, T::Float64, Q::Float64, A::Vector{Float64}, model::EoSModel)
+    CP = crit_mix(model, A)     #критическая точка
     nsub = length(A)
-    if T < CP[1]
-        function nl_dew(y)
-            eq = []
-            for i = 1:nsub
-                push!(eq, Q * y[i] + (1.0-Q) * dew_pressure(model, T, y)[4][i] - A[i])
+    if T < CP[1]    #если температура меньше критичсекой
+        if Q == 1.0 #частный случай - все в паровой фазе
+            y = A
+            prop =dew_pressure(model, T, y)
+            p = prop[1]
+            x = zeros(Float64, nsub)
+        elseif Q == 0.0     #все в жидкой фазе
+            x = A
+            prop = bubble_pressure(model, T, x)
+            p = prop[1]
+            y = zeros(Float64, nsub)
+        else    #двухфазная система
+            function nl_dew(y)
+                prop = dew_pressure(model, T, y)
+                eq = collect(Q * y[i] + (1.0-Q) * prop[4][i] - A[i] for i = 1: nsub)
+                return eq
             end
-            return eq
+            y = nlsolve(nl_dew, A).zero
+            prop =dew_pressure(model, T, y)
+            p = prop[1]
+            x = collect(prop[4])
         end
-        y = nlsolve(nl_dew, A).zero
-        p = dew_pressure(model, T, y)[1]
-        x = dew_pressure(model, T, y)[4]
+        return MaterialStream(N, T, p, x, y, Q, model)
     else
         println("Сверхкритическое состояние")
     end
-    return MaterialStream(G, T, p, x, y, Q, model)
 end
 
 """
@@ -28,7 +39,7 @@ Set stream at p -- pressure
 Q -- vapor mole fraction
 A -- initial mole fraction
 """
-function mstream_pQA(G::Float64, p::Float64,  Q::Float64, A::Vector{Float64}, model::EoSModel)
+function mstream_pQA(N::Float64, p::Float64,  Q::Float64, A::Vector{Float64}, model::EoSModel)
     CP = crit_mix(model, A)
     nsub = length(A)
     if Q == 1.0
@@ -66,7 +77,7 @@ function mstream_pQA(G::Float64, p::Float64,  Q::Float64, A::Vector{Float64}, mo
         T = sol[nsub]
         x = dew_pressure(model, T, y)[4]
     end
-    return MaterialStream(G, T, p, x, y, Q, model)
+    return MaterialStream(N, T, p, x, y, Q, model)
 end
 
 """
@@ -74,7 +85,7 @@ Set stream at T -- temperature
 p -- pressure
 A -- initial mole fraction
 """
-function mstream_TpA(G::Float64, T::Float64, p::Float64, A::Vector{Float64}, model::EoSModel)
+function mstream_TpA(N::Float64, T::Float64, p::Float64, A::Vector{Float64}, model::EoSModel)
     CP = crit_mix(model, A)
     if T < CP[1]
         pkip = bubble_pressure(model, T, A)[1]
@@ -128,6 +139,22 @@ function mstream_TpA(G::Float64, T::Float64, p::Float64, A::Vector{Float64}, mod
         y = A
         x = zeros(Float64, length(A))
     end
-    return MaterialStream(G, T, p, x, y, Q, model)
+    return MaterialStream(N, T, p, x, y, Q, model)
 end
 
+function mstream_phA(N::Float64, p::Float64, h::Float64, A::Vector{Float64}, model::EoSModel)
+    ms = mstream_pQA(N, p, 0.5, A, model)
+    if length(A) > 1
+        T = find_zero(T -> mstream_H_Tp(ms, T, p) - h, ms.T)
+        return mstream_TpA(N, T, p, A, model)
+    else
+        Q = find_zero(Q -> mstream_H_pQ(ms, p, Q) - h, 0.5)
+        return mstream_pQA(N, p, Q, A, model)
+    end
+end
+
+function mstream_phA(N::Float64, p::Float64, h::Float64, A::Vector{Float64}, model::EoSModel, Tinit::Float64)
+    ms = mstream_pQA(N, p, 1.0, A, model)
+    T = find_zero(T -> mstream_H_Tp(ms, T, p) - h, Tinit)
+    return mstream_TpA(N, T, p, A, model)
+end

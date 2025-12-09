@@ -9,12 +9,12 @@
 
 """
 Flow properties
-G -- mass flow [kg/s]
+N -- mole flow [mole/s]
 T -- temperature [K]
 
 """
 mutable struct MaterialStream
-    G::Float64          #mass flow
+    N::Float64          #mole flow
     T::Float64          #temperature
     p::Float64          #pressure
     x::AbstractArray    #mol frac in total flow
@@ -25,7 +25,7 @@ end
 
 "material stream copy"
 function material_stream_copy(s::MaterialStream)
-    return  MaterialStream(s.G, s.T, s.p, s.x, s.y, s.Q, s.model)
+    return  MaterialStream(s.N, s.T, s.p, s.x, s.y, s.Q, s.model)
 end
 
 """

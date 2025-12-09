@@ -1,29 +1,46 @@
 """
+Находит удельную мольную энтальпию потока
+
+"""
+function mstream_H(ms::MaterialStream)
+    A =  @. ms.Q * ms.y + (1.0-ms.Q) * ms.x         #расчет суммарной доли по фазам 
+    if 0.0 < ms.Q < 1.0    #двухфазная система
+        hl = enthalpy(ms.model, ms.p, ms.T, ms.x, phase=:liquid)
+        hv = enthalpy(ms.model, ms.p, ms.T, ms.y, phase=:vapor)
+        return ms.Q * hv + (1.0-ms.Q) * hl
+    elseif ms.Q == 0.0
+        return  enthalpy(ms.model, ms.p, ms.T, ms.x, phase=:liquid)
+    elseif ms.Q == 1.0
+        return  enthalpy(ms.model, ms.p, ms.T, ms.y, phase=:vapor)
+    end
+end
+
+function mstream_H_kJkg(ms::MaterialStream)
+    h = mstream_H(ms)    #Дж на моль
+    A =  @. ms.Q * ms.y + (1.0-ms.Q) * ms.x
+    Mₛ = sum(ms.model.params.Mw .* A) / 1000.0      #молярная масса смеси кг /моль
+    return h / Mₛ / 1000
+end
+
+
+"""
 calculates enthalpy [J/kg] of stream
 at specific temperature T
 """
 function mstream_H_T(s::MaterialStream, T)
-    ins = material_stream_copy(s)                                #внутренний временный поток
-    A =  @. ins.Q * ins.y + (1.0-ins.Q) * ins.x         #расчет суммарной доли по фазам
-    ins = mstream_TpA(ins.G, T, ins.p, A, ins.model)    #температура заменена   
-    #println("Q ", ins.Q)
-    if 0.0 < ins.Q < 1.0
-        #двухфазная система
-        M_x_sm = sum(ins.model.params.Mw .* ins.x) / 1000.0         #жидкая фаза
-        hl = enthalpy(ins.model, ins.p, ins.T, ins.x) / M_x_sm
-		M_y_sm = sum(ins.model.params.Mw .* ins.y) / 1000.0         #газовая фаза
-        hv = enthalpy(ins.model, ins.p, ins.T, ins.y) / M_y_sm
-        #println("2 ph hl", hl, " hv ", hv, " Q ", ins.Q)
-        return ins.Q * hv + (1.0-ins.Q) * hl
-    elseif ins.Q == 0.0
-        M_sm = sum(ins.model.params.Mw .* ins.x) / 1000.0   #молярная масса смеси [кг/моль]
-        #println("vap ", enthalpy(ins.model, ins.p, ins.T, ins.x), " Msm ", M_sm)
-        return  enthalpy(ins.model, ins.p, ins.T, ins.x) / M_sm
-    elseif ins.Q == 1.0
-        M_sm = sum(ins.model.params.Mw .* ins.y) / 1000.0
-        #println("liq ", enthalpy(ins.model, ins.p, ins.T, ins.y), " Msm ", M_sm)
-        return  enthalpy(ins.model, ins.p, ins.T, ins.y) / M_sm
-    end
+    A =  @. s.Q * s.y + (1.0-s.Q) * s.x         #расчет суммарной доли по фазам
+    ins = mstream_TpA(s.N, T, s.p, A, s.model)    #температура заменена   
+    return mstream_H(ins)
 end
 
+function mstream_H_Tp(ms::MaterialStream, T, p)
+    A =  @. ms.Q * ms.y + (1.0-ms.Q) * ms.x         #расчет суммарной доли по фазам
+    ins = mstream_TpA(ms.N, T, p, A, ms.model)    #температура заменена
+    return mstream_H(ins)
+end
 
+function mstream_H_pQ(ms::MaterialStream, p, Q)
+    A =  @. ms.Q * ms.y + (1.0-ms.Q) * ms.x         #расчет суммарной доли по фазам
+    ins = mstream_pQA(ms.N, p, Q, A, ms.model)  #(ms.N, T, p, A, ms.model)    #температура заменена
+    return mstream_H(ins)
+end
