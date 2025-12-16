@@ -7,7 +7,9 @@ export mstream_TQA
 export mstream_TpA
 export mstream_pQA
 
+#определение свойств
 export mstream_H_T
+export mstream_D, mstream_Dm
 
 export heater_W
 export heater_Q
@@ -21,6 +23,7 @@ using Clapeyron
 using Roots
 using NLsolve
 using Integrals
+using Test
 
 
 include("structs.jl")

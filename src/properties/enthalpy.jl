@@ -44,3 +44,9 @@ function mstream_H_pQ(ms::MaterialStream, p, Q)
     ins = mstream_pQA(ms.N, p, Q, A, ms.model)  #(ms.N, T, p, A, ms.model)    #температура заменена
     return mstream_H(ins)
 end
+
+function mstream_H_TQ(ms::MaterialStream, T, Q)
+    A =  @. ms.Q * ms.y + (1.0-ms.Q) * ms.x
+    ins = mstream_TQA(ms.N, T, Q, A, ms.model)
+    return mstream_H(ins)
+end
