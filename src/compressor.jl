@@ -3,6 +3,11 @@
 
 """
 function compress(ms, Δp)
+    Tout = zeros(Float64, 0)
+    ρout = zeros(Float64, 0)
+    T2 = zeros(Float64, 0)
+    ρ2 = zeros(Float64, 0)
+    #
     ms_out = material_stream_copy(ms)
     hᵢ = mstream_H(ms_out)
     N = 100
@@ -34,6 +39,8 @@ function compress(ms, Δp)
             ms_out.T = find_zero(T -> mstream_H_T(ms_out, T) - hᵢ, ms_out.T)
             ms_out.p = ms_out.p + δp
             ms_out = mstream_TpA(ms_out.N, ms_out.T, ms_out.p, A, ms_out.model)
+            push!(Tout, ms_out.T)
+            push!(ρout, mstream_D(ms_out))
         end
     elseif ms_out.Q == 1 && Δp > 0.0
         #1 интеграл
@@ -46,6 +53,8 @@ function compress(ms, Δp)
                 ms_out.p = ms_out.p + δp
                 ms_out.T = find_zero(T -> mstream_H_T(ms_out, T) - hᵢ, ms_out.T)
                 ms_out = mstream_TpA(ms_out.N, ms_out.T, ms_out.p, A, ms_out.model)
+                push!(Tout, ms_out.T)
+                push!(ρout, mstream_D(ms_out))
             else
                 ρ = mstream_Dm(ms_out)
                 #hᵢ = hᵢ + (pₖ - ms_out.p) / ρ
@@ -53,27 +62,33 @@ function compress(ms, Δp)
                 #ms_out.T = find_zero(T -> mstream_H_T(ms_out, T) - hᵢ, ms_out.T)
                 ms_out = mstream_pQA(ms_out.N, pₖ, 1.0, A, ms_out.model)
                 hᵢ = mstream_H(ms_out)
+                push!(Tout, ms_out.T)
+                push!(ρout, mstream_D(ms_out))
                 break
             end
         end
         #println("p int 1 ", ms_out.p, " T ", ms_out.T)
         #2 интеграл
         if ms_out.p < pₒᵤₜ
-            for q = 1:-0.01:0
+            for q = 0.99:-0.01:0
                 ρ = mstream_Dm(ms_out)
                 pᵢ₊₁ = mstream_TQA(ms_out.N, ms_out.T, q, A, ms_out.model).p
                 hᵢ = hᵢ + (pᵢ₊₁ - ms_out.p) / ρ
-                println("H ", mstream_H_pQ(ms_out, pᵢ₊₁, q), " p ", pᵢ₊₁, " q ", q, "ms out Q ", ms_out.Q, " p ", pₒᵤₜ, " T ", ms_out.T)
+                #println("H ", mstream_H_pQ(ms_out, pᵢ₊₁, q), " p ", pᵢ₊₁, " q ", q, "ms out Q ", ms_out.Q, " p ", pₒᵤₜ, " T ", ms_out.T)
                 if pᵢ₊₁ > pₒᵤₜ
-                    println(" err ", mstream_H_pQ(ms_out, pₒᵤₜ, q), " ms out Q", ms_out.Q)
+                    #println(" err ", mstream_H_pQ(ms_out, pₒᵤₜ, q), " ms out Q", ms_out.Q)
                     q = find_zero(q -> mstream_H_pQ(ms_out, pₒᵤₜ, q) - hᵢ, q)
                     ms_out = mstream_pQA(ms_out.N, pₒᵤₜ, q, A, ms_out.model)
+                    push!(T2, ms_out.T)
+                    push!(ρ2, mstream_D(ms_out))
                     break
                 else
                     T = find_zero(T -> mstream_H_TQ(ms_out, T, q) - hᵢ, ms_out.T)
                     #ms_out = mstream_pQA(ms_out.N, pᵢ₊₁, q, A, ms_out.model)
                     #ms_out = mstream_TQA(ms_out.N, T, q, A, ms_out.model)
                     ms_out = mstream_TpA(ms_out.N, T, pᵢ₊₁, A, ms_out.model)
+                    push!(T2, ms_out.T)
+                    push!(ρ2, mstream_D(ms_out))
                 end
             end
         end
@@ -103,7 +118,8 @@ function compress(ms, Δp)
                 hᵢ₊₁ = hᵢ + (pₖ - ms_out.p) / ρ
                 ms_out.T = find_zero(T -> mstream_H_T(ms_out, T) - hᵢ₊₁, ms_out.T)
                 ms_out.p = ms_out.p + (pₖ - ms_out.p)
-                ms_out = mstream_TpA(ms_out.N, ms_out.T, ms_out.p, A, ms_out.model)
+                ms_out = mstream_pQA(ms_out.N, pₖ, 1.0, A, ms_out.model)
+                #ms_out = mstream_TpA(ms_out.N, ms_out.T, ms_out.p, A, ms_out.model)
                 break
             end
         end
@@ -136,5 +152,5 @@ function compress(ms, Δp)
         end
     end
     
-    return ms_out
+    return ms_out, Tout, ρout, T2, ρ2
 end

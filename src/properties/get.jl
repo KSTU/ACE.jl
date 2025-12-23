@@ -1,4 +1,13 @@
 
+function ms_get_vapor_molar_mass(ms)
+    return sum(ms.y .* ms.model.params.Mw)
+end
+
+function ms_get_liquid_molar_mass(ms)
+    return sum(ms.x .* ms.model.params.Mw)
+end
+
+
 
 function ms_get_liquid_density(ms)
     if ms.Q < 1
