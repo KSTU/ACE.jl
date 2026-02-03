@@ -1,6 +1,5 @@
 """
-Находит удельную мольную энтальпию потока
-
+Calculate molar enthalpy [J/mol] of stream
 """
 function mstream_H(ms::MaterialStream)
     A =  @. ms.Q * ms.y + (1.0-ms.Q) * ms.x         #расчет суммарной доли по фазам 
@@ -15,6 +14,9 @@ function mstream_H(ms::MaterialStream)
     end
 end
 
+"""
+Calculate mass enthalpy [J/kg] of stream
+"""
 function mstream_H_kJkg(ms::MaterialStream)
     h = mstream_H(ms)    #Дж на моль
     A =  @. ms.Q * ms.y + (1.0-ms.Q) * ms.x
@@ -33,6 +35,11 @@ function mstream_H_T(s::MaterialStream, T)
     return mstream_H(ins)
 end
 
+"""
+calculates enthalpy [J/mol] of stream
+at specific temperature T
+and pressure p
+"""
 function mstream_H_Tp(ms::MaterialStream, T, p)
     A =  @. ms.Q * ms.y + (1.0-ms.Q) * ms.x         #расчет суммарной доли по фазам
     ins = mstream_TpA(ms.N, T, p, A, ms.model)    #температура заменена

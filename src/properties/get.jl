@@ -7,8 +7,6 @@ function ms_get_liquid_molar_mass(ms)
     return sum(ms.x .* ms.model.params.Mw)
 end
 
-
-
 function ms_get_liquid_density(ms)
     if ms.Q < 1
         return mass_density(ms.model, ms.p, ms.T, ms.x; phase = :liquid)
@@ -40,3 +38,4 @@ function ms_get_vapor_entalpy(ms)
         println("нет паровой фазы")
     end
 end
+

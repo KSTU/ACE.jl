@@ -34,13 +34,13 @@ function compress(ms, Δp)
 
     if ms_out.T > CP[1] || (ms_out.Q == 1 && Δp < 0) || (ms_out.Q == 0 && Δp > 0)
         for i = 1:N
-            ρ = mstream_Dm(ms_out)
+            ρ = mstream_D_mole(ms_out)
             hᵢ = hᵢ + δp / ρ        
             ms_out.T = find_zero(T -> mstream_H_T(ms_out, T) - hᵢ, ms_out.T)
             ms_out.p = ms_out.p + δp
             ms_out = mstream_TpA(ms_out.N, ms_out.T, ms_out.p, A, ms_out.model)
             push!(Tout, ms_out.T)
-            push!(ρout, mstream_D(ms_out))
+            push!(ρout, mstream_D_mass(ms_out))
         end
     elseif ms_out.Q == 1 && Δp > 0.0
         #1 интеграл
